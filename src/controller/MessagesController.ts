@@ -3,20 +3,26 @@ import { NextFunction, Request, Response } from "express";
 import { RoomMessages } from "../entity/Messages";
 import { UserRoom } from "../entity/UserRoom";
 import { User } from "../entity/User";
+import { ChatRoom } from "../entity/ChatRoom";
+import { DateExtended } from "../utils";
 
 export class MessagesController {
 
     private messagesRepository = getRepository(RoomMessages);
     private userRoomRepository = getRepository(UserRoom);
+    private userRepository = getRepository(User);
+    private chatRoomRepository = getRepository(ChatRoom);
 
     async getMessagesFromLast(request: Request, response: Response, next: NextFunction) {
         const userId = request.session.userId;
         const roomId = parseInt(request.params.roomId);
         const userRoom = await this.userRoomRepository.findOne({
-            roomId,
-            userId
+            where: {
+                room: roomId,
+                user: userId
+            }
         });
-        if (!userRoom.id) {
+        if (!userRoom || !userRoom.id) {
             return {
                 status: 400, Message: `The userId ${userId} is not a member of the roomId ${roomId}!`
             }
@@ -24,18 +30,9 @@ export class MessagesController {
         const offset = parseInt(request.params.offset || '0');
         return this.messagesRepository
             .createQueryBuilder("msg")
-            .select("*")
-            .where('msg.roomId = :roomId', { roomId })
-            .innerJoin(
-                query => {
-                    return query
-                        .from(User, 'userData')
-                        .select("*")
-                        .cache(true)
-                },
-                'userData',
-                'msg.userId = userData.id'
-            )
+            .select('msg.*, userData.userName, userData.firstName, userData.lastName, userData.userImage')
+            .leftJoin('msg.user', 'userData')
+            .where('msg.room = :roomId', { roomId })
             .limit(50)
             .offset(offset)
             .orderBy('msg.createdAt', 'DESC')
@@ -46,10 +43,12 @@ export class MessagesController {
         const userId = request.session.userId;
         const roomId = parseInt(request.params.roomId);
         const userRoom = await this.userRoomRepository.findOne({
-            roomId,
-            userId
+            where: {
+                room: roomId,
+                user: userId
+            }
         });
-        if (!userRoom.id) {
+        if (!userRoom || !userRoom.id) {
             return {
                 status: 400, Message: `The userId ${userId} is not a member of the roomId ${roomId}!`
             }
@@ -61,22 +60,13 @@ export class MessagesController {
         if (offset <= 0) {
             readResults = await this.messagesRepository
                 .createQueryBuilder("msg")
-                .select("*")
-                .where('msg.roomId = :roomId AND msg.createdAt <= :lastVisit', {
-                    roomId,
+                .select('msg.*, userData.userName, userData.firstName, userData.lastName, userData.userImage')
+                .where('msg.room = :roomId', { roomId })
+                .andWhere('msg.createdAt <= :lastVisit', {
                     lastVisit: userRoom.lastVisit
                 })
-                .innerJoin(
-                    query => {
-                        return query
-                            .from(User, 'userData')
-                            .select("*")
-                            .cache(true)
-                    },
-                    'userData',
-                    'msg.userId = userData.id'
-                )
-                .limit(20)
+                .leftJoin('msg.user', 'userData')
+                .limit(3)
                 .offset(readOffset)
                 .orderBy('msg.createdAt', 'DESC')
                 .getRawMany()
@@ -84,38 +74,38 @@ export class MessagesController {
         if (offset >= 0) {
             unreadResults = await this.messagesRepository
                 .createQueryBuilder("msg")
-                .select("*")
-                .where('msg.roomId = :roomId AND msg.createdAt > :lastVisit', {
-                    roomId,
+                .select('msg.*, userData.userName, userData.firstName, userData.lastName, userData.userImage')
+                .where('msg.room = :roomId', { roomId })
+                .andWhere('msg.createdAt > :lastVisit', {
                     lastVisit: userRoom.lastVisit
                 })
-                .innerJoin(
-                    query => {
-                        return query
-                            .from(User, 'userData')
-                            .select("*")
-                            .cache(true)
-                    },
-                    'userData',
-                    'msg.userId = userData.id'
-                )
-                .limit(20)
+                .leftJoin('msg.user', 'userData')
+                .limit(3)
                 .offset(unreadOffset)
                 .orderBy('msg.createdAt', 'ASC')
                 .getRawMany()
         }
-        return {
-            readMessages: readResults,
-            unreadMessages: unreadResults.reverse()
+        let retObj = {
+            readMessages: null,
+            unreadMessages: null
+        };
+        if (readResults) {
+            retObj.readMessages = readResults;
         }
+        if (unreadResults) {
+            retObj.unreadMessages = unreadResults.reverse();
+        }
+        return retObj;
     }
 
     async sendNewMessage(request: Request, response: Response, next: NextFunction) {
         const userId = request.session.userId;
         const roomId = parseInt(request.params.roomId);
         const userRoom = await this.userRoomRepository.findOne({
-            roomId,
-            userId
+            where: {
+                room: roomId,
+                user: userId
+            }
         });
         if (!userRoom.id) {
             return {
@@ -124,11 +114,11 @@ export class MessagesController {
         }
         const msgData = request.body;
         const newMsg = new RoomMessages()
-        newMsg.userId = userId;
-        newMsg.roomId = roomId;
-        newMsg.messageText = msgData.messageText;
-        newMsg.messageImage = msgData.messageImage;
-        newMsg.createdAt = new Date();
+        newMsg.user = await this.userRepository.findOne(userId);
+        newMsg.room = await this.chatRoomRepository.findOne(roomId);
+        newMsg.messageText = msgData.messageText || '';
+        newMsg.messageImage = msgData.messageImage || '';
+        newMsg.createdAt = (new DateExtended().getMysqlFormat())
         return this.messagesRepository.save(newMsg);
     }
 

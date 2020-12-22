@@ -8,14 +8,14 @@ export class User {
     @PrimaryGeneratedColumn()
     id: number;
 
-    @OneToMany(() => UserRoom, userRoom => userRoom.chatUser)
+    @OneToMany(() => UserRoom, userRoom => userRoom.user)
     usersInRoom: UserRoom[]
 
-    @OneToMany(() => RoomMessages, msg => msg.msgUser)
+    @OneToMany(() => RoomMessages, msg => msg.user)
     msgs: RoomMessages[]
 
     @Index({ unique: true })
-    @Column("text")
+    @Column({ type: "varchar", length: 60 })
     username: string;
 
     @Column("text")
@@ -24,6 +24,6 @@ export class User {
     @Column("text")
     lastName: string;
 
-    @Column("string")
+    @Column("text")
     userImage: string
 }

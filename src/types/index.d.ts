@@ -6,3 +6,8 @@ declare module 'express-session' {
         username: string;
     }
 }
+declare global {
+    interface Date {
+        getMysqlFormat(): string;
+    }
+}

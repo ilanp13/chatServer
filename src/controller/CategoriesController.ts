@@ -7,58 +7,82 @@ import { UserRoom } from "../entity/UserRoom";
 export class CategoryController {
 
     private categoryRepository = getRepository(ChatCategory);
+    private chatRoomsRepository = getRepository(ChatRoom);
 
     async all(request: Request, response: Response, next: NextFunction) {
         const userId = request.session.userId;
-        return this.categoryRepository
+        const catList = await this
+            .categoryRepository
             .createQueryBuilder("cat")
-            .select("cat.catName")
-            .innerJoin(
-                query => this.roomsUsersInnerJoins(query, userId).limit(5),
-                'rooms',
-                'cat.id = rooms.chatCat'
-            )
-            .orderBy('cat.catName', 'ASC')
-            .getRawMany()
+            .getRawMany();
+
+        for (let i = 0; i < catList.length; i++) {
+            let query = this.chatRoomsRepository.createQueryBuilder('room')
+                .select('room.*, userRoom1.membersCount, userRoom2.userInRoom')
+                .leftJoin(
+                    query => {
+                        return query
+                            .from(UserRoom, 'ur1')
+                            .select('ur1.room AS ur1_roomId, COUNT(ur1.user)', 'membersCount')
+                            .groupBy('ur1.room')
+                    },
+                    'userRoom1',
+                    'room.id = ur1_roomId'
+                )
+                .leftJoin(
+                    query => {
+                        return query
+                            .from(UserRoom, 'ur2')
+                            .select('ur2.room AS ur2_roomId, COUNT(ur2.user)', 'userInRoom')
+                            .where('ur2.user = :userId', { userId })
+                            .groupBy('ur2.room')
+                    },
+                    'userRoom2',
+                    'room.id = ur2_roomId'
+                )
+                .where('room.categoryId = :catId', { catId: catList[i].cat_id })
+                .orderBy('membersCount', 'DESC')
+                .limit(5);
+            catList[i]['rooms'] = await query.getRawMany();
+        };
+        return catList;
     }
 
     async roomsInCategory(request: Request, response: Response, next: NextFunction) {
         const userId = request.session.userId;
-        return this.categoryRepository
+        const catData = await this
+            .categoryRepository
             .createQueryBuilder("cat")
-            .select("cat.catName")
             .where('cat.id = :catId', { catId: request.params.catId })
-            .innerJoin(
-                query => this.roomsUsersInnerJoins(query, userId),
-                'rooms',
-                'cat.id = rooms.chatCat'
-            )
-            .getRawOne()
-    }
+            .getRawOne();
 
-    private roomsUsersInnerJoins(query: SelectQueryBuilder<any>, userId: number) {
-        return query
-            .from(ChatRoom, 'rooms')
-            .select('*')
-            .innerJoin(
+        catData['rooms'] = await this.chatRoomsRepository.createQueryBuilder('room')
+            .select('room.*, userRoom1.membersCount, userRoom2.userInRoom')
+            .leftJoin(
                 query => {
                     return query
-                        .from(UserRoom, 'userRoom1')
-                        .select('COUNT(userRoom1.userId)', 'membersCount')
+                        .from(UserRoom, 'ur1')
+                        .select('ur1.room AS ur1_roomId, COUNT(ur1.user)', 'membersCount')
+                        .groupBy('ur1.room')
                 },
                 'userRoom1',
-                'rooms.id = userRoom1.roomId'
+                'room.id = ur1_roomId'
             )
-            .innerJoin(
+            .leftJoin(
                 query => {
                     return query
-                        .from(UserRoom, 'userRoom2')
-                        .select('COUNT(userRoom2.userId)', 'userInRoom')
-                        .where('userRoom2.userId = :userId', { userId })
+                        .from(UserRoom, 'ur2')
+                        .select('ur2.room AS ur2_roomId, COUNT(ur2.user)', 'userInRoom')
+                        .where('ur2.user = :userId', { userId })
+                        .groupBy('ur2.room')
                 },
                 'userRoom2',
-                'rooms.id = userRoom2.roomId'
+                'room.id = ur2_roomId'
             )
+            .where('room.categoryId = :catId', { catId: catData.cat_id })
             .orderBy('membersCount', 'DESC')
+            .getRawMany()
+
+        return catData;
     }
 }

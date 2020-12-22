@@ -12,6 +12,9 @@
             "sourceMap": true,
             "typeRoots": [
                   "./src/types"
+            ],
+            "types": [
+                  "node"
             ]
       }
 }

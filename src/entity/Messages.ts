@@ -2,17 +2,16 @@ import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn, In
 import { User } from "./User";
 import { ChatRoom } from "./ChatRoom";
 
-
 @Entity()
-@Index(["roomId", "createdAt"])
+@Index(["room", "createdAt"])
 export class RoomMessages {
 
     @PrimaryGeneratedColumn()
     id: number;
 
     @Index()
-    @CreateDateColumn({ type: "timestamp", default: () => new Date() })
-    createdAt: Date;
+    @Column("timestamp", { default: () => "CURRENT_TIMESTAMP" })
+    createdAt: string;
 
     @Column("text")
     messageText: string;
@@ -20,15 +19,9 @@ export class RoomMessages {
     @Column("text")
     messageImage: string;
 
-    @Column()
-    userId: number;
-
-    @Column()
-    roomId: number;
-
     @ManyToOne(() => User, user => user.msgs)
-    msgUser: User
+    user: User
 
     @ManyToOne(() => ChatRoom, room => room.msgs)
-    msgRoom: ChatRoom
+    room: ChatRoom
 }

@@ -10,6 +10,6 @@ export class ChatCategory {
     @Column("text")
     catName: string;
 
-    @OneToMany(() => ChatRoom, room => room.chatCat)
+    @OneToMany(() => ChatRoom, room => room.category)
     rooms: ChatRoom[]
 }

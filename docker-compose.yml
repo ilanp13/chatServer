@@ -1,12 +1,12 @@
 version: '3.3'
 services:
-  db:
+  chat_mysql_service:
     container_name: chat_mysql
+    command: --default-authentication-plugin=mysql_native_password
     image: mysql:5.7
-    restart: always
-    hostname: chat_mysql
+    restart: on-failure
     environment:
-      MYSQL_DATABASE: 'chat_server'
+      MYSQL_DATABASE: 'chat_app_db'
       MYSQL_USER: 'chat'
       MYSQL_PASSWORD: 'ChatPsswd123'
       MYSQL_ROOT_PASSWORD: 'ChatPsswd123'
@@ -21,10 +21,23 @@ services:
     build:
       context: ./
       dockerfile: Dockerfile
-    hostname: chat_server
     ports:
       - 3000:3000
+    expose:
+      - '3000'
     container_name: chat_server
+    environment:
+      DB_TYPE: 'mysql'
+      DATABASE_HOST: chat_mysql_service
+      MYSQL_DATABASE: 'chat_app_db'
+      MYSQL_USER: 'chat'
+      MYSQL_PASSWORD: 'ChatPsswd123'
+      NODE_ENV: 'development'
+      MYSQL_PORT: '3306'
+    links:
+      - chat_mysql_service
+    depends_on:
+      - chat_mysql_service
 
 volumes:
   my-db:

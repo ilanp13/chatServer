@@ -5,23 +5,43 @@ import * as session from "express-session";
 import * as bodyParser from "body-parser";
 import { Request, Response } from "express";
 import { Routes } from "./routes";
-import { ChatSession } from "./entity/Session"
-import { TypeormStore } from "connect-typeorm/out";
+import { MysqlConnectionOptions } from "typeorm/driver/mysql/MysqlConnectionOptions";
+import { CookieOptions } from "express-serve-static-core";
+import { DataFillerController } from "./controller/DataFillerController";
 
-createConnection().then(async connection => {
+const dbConfig = <MysqlConnectionOptions>{
+    type: process.env.DB_TYPE || 'mysql',
+    host: process.env.DATABASE_HOST || 'localhost',
+    port: parseInt(process.env.MYSQL_PORT || '3306'),
+    username: process.env.MYSQL_USER,
+    password: process.env.MYSQL_PASSWORD,
+    database: process.env.MYSQL_DATABASE,
+    entities: [
+        __dirname + '/entity/*.ts'
+    ]
+}
+
+createConnection(dbConfig).then(async connection => {
     // create express app
     const app = express();
-    app.use(session({
+    await (new DataFillerController()).createTables();
+
+    const sessionConfig = {
         secret: 'dummy_secret',
-        store: new TypeormStore({
-            cleanupLimit: 2,
-            ttl: 86400
-        }).connect(connection.getRepository(ChatSession)),
-        saveUninitialized: false,
+        cookie: <CookieOptions>{},
+        saveUninitialized: true,
         resave: false
-    }))
+    }
+    if (process.env.NODE_ENV === 'production') {
+        app.set('trust proxy', 1) // trust first proxy
+        sessionConfig.cookie.secure = true // serve secure cookies
+    }
+    app.use(session(sessionConfig))
     app.use(bodyParser.json());
     app.use(bodyParser.urlencoded({ extended: true }));
+    app.get('/health', (req: Request, res: Response, next: Function) => {
+        res.json({ status: 200, Message: "server is up" })
+    })
 
     // register express routes from defined application routes
     Routes.forEach(route => {
@@ -43,6 +63,6 @@ createConnection().then(async connection => {
         });
     });
     app.listen(3000);
-    console.log("Express server has started on port 3000. Open http://localhost:3000/users to see results");
+    console.log("Express server has started on port 3000. Open http://localhost:3000/health");
 
 }).catch(error => console.log(error));

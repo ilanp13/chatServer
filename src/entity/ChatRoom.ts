@@ -10,12 +10,12 @@ export class ChatRoom {
     id: number;
 
     @ManyToOne(() => ChatCategory, chatCat => chatCat.rooms)
-    chatCat: ChatCategory;
+    category: ChatCategory;
 
-    @OneToMany(() => UserRoom, userRoom => userRoom.chatRoom)
+    @OneToMany(() => UserRoom, userRoom => userRoom.room)
     usersInRoom: UserRoom[]
 
-    @OneToMany(() => RoomMessages, msg => msg.msgRoom)
+    @OneToMany(() => RoomMessages, msg => msg.room)
     msgs: RoomMessages[]
 
     @Column("text")

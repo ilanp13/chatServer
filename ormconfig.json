@@ -1,25 +1,27 @@
 {
-   "type": "mysql",
-   "host": "chat_mysql",
-   "port": 3306,
+   "environment": "development",
+   "host": "chat_mysql_service",
    "username": "chat",
    "password": "ChatPsswd123",
-   "database": "chat_server",
+   "database": "chat_app_db",
    "synchronize": true,
-   "logging": false,
+   "logging": true,
    "cache": true,
    "entities": [
-      "src/entity/**/*.ts"
+      "./src/entity/*.ts"
    ],
    "migrations": [
-      "src/migration/**/*.ts"
+      "./src/migration/**/*.ts"
    ],
    "subscribers": [
-      "src/subscriber/**/*.ts"
+      "./src/subscriber/**/*.ts"
    ],
    "cli": {
       "entitiesDir": "src/entity",
       "migrationsDir": "src/migration",
       "subscribersDir": "src/subscriber"
+   },
+   "extra": {
+      "insecureAuth": true
    }
 }

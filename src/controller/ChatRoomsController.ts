@@ -3,58 +3,75 @@ import { NextFunction, Request, Response } from "express";
 import { ChatRoom } from "../entity/ChatRoom";
 import { UserRoom } from "../entity/UserRoom";
 import { RoomMessages } from "../entity/Messages";
+import { User } from "../entity/User";
+import { DateExtended } from "../utils";
 
 export class ChatRoomController {
 
     private chatRoomRepository = getRepository(ChatRoom);
     private userRoomRepository = getRepository(UserRoom);
+    private userRepository = getRepository(User);
 
     async getUserChatRooms(request: Request, response: Response, next: NextFunction) {
         const userId = request.session.userId;
-        return this.chatRoomRepository
+        let q = this.chatRoomRepository
             .createQueryBuilder('room')
-            .select('*')
-            .innerJoin(
+            .select('room.*, userRoom1.membersCount, userRoom2.userInRoom, userRoom3.unreadCount, msgs2.lastMsgTime')
+            .leftJoin(
                 query => {
                     return query
-                        .from(UserRoom, 'userRoom1')
-                        .select('COUNT(userRoom1.userId)', 'membersCount')
+                        .from(UserRoom, 'ur1')
+                        .select('ur1.room AS ur1_roomId, COUNT(ur1.user)', 'membersCount')
+                        .groupBy('ur1.room')
                 },
                 'userRoom1',
-                'room.id = userRoom1.roomId'
+                'room.id = ur1_roomId'
             )
-            .innerJoin(
+            .leftJoin(
                 query => {
                     return query
-                        .from(UserRoom, 'userRoom2')
-                        .select('userRoom2.lastVisit, COUNT(userRoom2.userId)', 'userInRoom')
-                        .where('userRoom2.userId = :userId', { userId })
+                        .from(UserRoom, 'ur2')
+                        .select('ur2.room AS ur2_roomId, COUNT(ur2.user)', 'userInRoom')
+                        .where('ur2.user = :userId', { userId })
+                        .groupBy('ur2.room')
                 },
                 'userRoom2',
-                'room.id = userRoom2.roomId'
+                'room.id = ur2_roomId'
             )
-            .innerJoin(
+            .leftJoin(
                 query => {
                     return query
-                        .from(RoomMessages, 'msgs1')
-                        .select('COUNT(msgs1.id)', 'unreadCount')
-                        .where('msgs1.createdAt > userRoom2.lastVisit')
+                        .from(UserRoom, 'ur3')
+                        .select('ur3.room AS ur3_roomId, ur3.lastVisit AS lastVisitInRoom, COUNT(ms1_createdAt)', 'unreadCount')
+                        .leftJoin(
+                            query => {
+                                return query
+                                    .from(RoomMessages, 'ms1')
+                                    .select('ms1.room as ms1_roomId, ms1.createdAt', 'ms1_createdAt')
+                            },
+                            'msgs1',
+                            'ur3.room = ms1_roomId'
+                        )
+                        .where('ur3.user = :userId', { userId })
+                        .andWhere('ms1_createdAt > ur3.lastVisit')
+                        .groupBy('ur3_roomId, lastVisitInRoom')
                 },
-                'msgs1',
-                'room.id = msgs1.roomId'
+                'userRoom3',
+                'room.id = ur3_roomId'
             )
-            .innerJoin(
+            .leftJoin(
                 query => {
                     return query
-                        .from(RoomMessages, 'msgs2')
-                        .select('msgs2.createdAt', 'lastMsgTime')
+                        .from(RoomMessages, 'ms2')
+                        .select('ms2.room as ms2_roomId, MAX(ms2.createdAt)', 'lastMsgTime')
+                        .groupBy('ms2.room')
                 },
                 'msgs2',
-                'room.id = msgs2.roomId'
+                'room.id = ms2_roomId'
             )
-            .where('userInRoom > 0')
+            .where('userRoom2.userInRoom > 0')
             .orderBy('msgs2.lastMsgTime', 'DESC')
-            .getRawMany()
+        return q.getRawMany()
 
     }
 
@@ -62,15 +79,17 @@ export class ChatRoomController {
         const userId = request.session.userId;
         const roomId = parseInt(request.params.roomId);
         const userRoom = await this.userRoomRepository.findOne({
-            roomId,
-            userId
+            where: {
+                room: roomId,
+                user: userId
+            }
         });
-        if (!userRoom.id) {
+        if (!userRoom || !userRoom.id) {
             return {
                 status: 400, Message: `The userId ${userId} is not a member of the roomId ${roomId}!`
             }
         }
-        userRoom.lastVisit = new Date();
+        userRoom.lastVisit = (new DateExtended().getMysqlFormat())
         return this.userRoomRepository.save(userRoom);
     }
 
@@ -78,16 +97,18 @@ export class ChatRoomController {
         const userId = request.session.userId;
         const roomId = parseInt(request.params.roomId);
         const userRoom = await this.userRoomRepository.findOne({
-            roomId,
-            userId
+            where: {
+                room: roomId,
+                user: userId
+            }
         });
-        if (userRoom.id) {
-            return { status: 400, Message: `UserId ${userId} is already part of room id ${userRoom.roomId} ` }
+        if (userRoom && userRoom.id) {
+            return { status: 400, Message: `UserId ${userId} is already part of room id ${roomId} ` }
         }
         let newUserRoom = new UserRoom();
-        newUserRoom.userId = userId;
-        newUserRoom.roomId = roomId;
-        newUserRoom.lastVisit = new Date();
+        newUserRoom.user = await this.userRepository.findOne(userId);
+        newUserRoom.room = await this.chatRoomRepository.findOne(roomId);
+        newUserRoom.lastVisit = (new DateExtended().getMysqlFormat())
         return this.userRoomRepository.save(newUserRoom);
     }
 
@@ -95,10 +116,12 @@ export class ChatRoomController {
         const userId = request.session.userId;
         const roomId = parseInt(request.params.roomId);
         const userRoom = await this.userRoomRepository.findOne({
-            roomId,
-            userId
+            where: {
+                room: roomId,
+                user: userId
+            }
         });
-        if (!userRoom.id) {
+        if (!userRoom || !userRoom.id) {
             return {
                 status: 400, Message: `The userId ${userId} is not a member of the roomId ${roomId}!`
             }
