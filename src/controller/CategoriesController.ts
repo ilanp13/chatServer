@@ -1,4 +1,4 @@
-import { getRepository, SelectQueryBuilder } from "typeorm";
+import { getRepository } from "typeorm";
 import { NextFunction, Request, Response } from "express";
 import { ChatCategory } from "../entity/ChatCategory";
 import { ChatRoom } from "../entity/ChatRoom";

@@ -75,4 +75,4 @@ docker-compose up
   * The stack will create a VPC, subnet, security group, launch template and instance to run the server and the mysql server (on same instance).
   * I didn't implement any Load balancing, scaling... In production we would use a better mysql server than a dockerized one on the same instance as the api server itself.
 * I've deployed the server into a free tier account (mine).
-* You can view the api at: ```http://3.136.206.2:3000/health``` (it's an elastic IP, so should stay that ip)
+* You can view the api at: [http://3.136.206.2:3000/health](http://3.136.206.2:3000/health) (it's an elastic IP, so should stay that ip)

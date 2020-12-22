@@ -3,7 +3,12 @@
    "version": "0.0.1",
    "description": "Awesome project developed with TypeORM.",
    "devDependencies": {
+      "@types/jest": "^26.0.19",
       "@types/node": "^8.10.66",
+      "@types/supertest": "^2.0.10",
+      "jest-environment-node-single-context": "^26.2.0",
+      "supertest": "^6.0.1",
+      "ts-jest": "^26.4.4",
       "ts-node": "3.3.0",
       "typescript": "3.3.3333"
    },
@@ -18,8 +23,24 @@
       "typeorm": "0.2.29"
    },
    "scripts": {
+      "test": "jest",
       "start": "ts-node src/index.ts",
       "aws-deploy:create": "aws cloudformation create-stack --stack-name ChatServerStack --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM --template-body file://$(pwd)/cloudformation-template.yml --parameters ParameterKey=AmiId,ParameterValue=$AMI_ID ParameterKey=InstanceType,ParameterValue=$INSTANCE_TYPE ParameterKey=ChatGitRepoUrl,ParameterValue=$GIT_REPO_URL",
       "aws-deploy:update": "aws cloudformation update-stack --stack-name ChatServerStack --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM --template-body file://$(pwd)/cloudformation-template.yml --parameters ParameterKey=AmiId,ParameterValue=$AMI_ID ParameterKey=InstanceType,ParameterValue=$INSTANCE_TYPE ParameterKey=ChatGitRepoUrl,ParameterValue=$GIT_REPO_URL"
+   },
+   "jest": {
+      "clearMocks": true,
+      "maxWorkers": 1,
+      "preset": "ts-jest",
+      "testEnvironment": "node",
+      "coveragePathIgnorePatterns": [
+         "/node_modules/"
+      ],
+      "testMatch": [
+         "**/__tests__/**/*.spec.[jt]s?(x)",
+         "!**/__tests__/coverage/**",
+         "!**/__tests__/utils/**",
+         "!**/__tests__/images/**"
+      ]
    }
 }
