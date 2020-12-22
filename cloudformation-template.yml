@@ -186,6 +186,7 @@ Resources:
             - |
                #!/bin/bash
                sudo yum update -y
+
                curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.34.0/install.sh | bash
                . ~/.nvm/nvm.sh
                nvm install node
@@ -203,7 +204,7 @@ Resources:
                docker-compose build
                docker-compose up
             - gitRepo: !Ref ChatGitRepoUrl
-      LaunchTemplateName: !Sub "chat-server-launchTemplate"
+      LaunchTemplateName: !Sub "chat-server-launch-template"
 
   ChatServerInstance:
     Type: AWS::EC2::Instance

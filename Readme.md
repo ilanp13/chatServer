@@ -76,3 +76,9 @@ docker-compose up
   * I didn't implement any Load balancing, scaling... In production we would use a better mysql server than a dockerized one on the same instance as the api server itself.
 * I've deployed the server into a free tier account (mine).
 * You can view the api at: [http://3.136.206.2:3000/health](http://3.136.206.2:3000/health) (it's an elastic IP, so should stay that ip)
+
+## Tests
+* I've implemented some tests, with jest and supertest.
+* I didn't implement all the possible tests, just wanted to create some to show how it supposed to be added in this project. 
+* Rest of the tests are supposed to be written in same way, only lots more of mocking code to enter.
+* in order to run the few tests i implemented, run the command ```npm run test``` or ```npx jest```
