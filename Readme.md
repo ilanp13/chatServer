@@ -20,10 +20,10 @@ docker-compose up
     * POST /users - will save a new user - with this params as body:
       ```json
       {
-          username: string (unique),
-          firstName: string,
-          lastName: string,
-          userImage: string (url of image)
+          "username": "string (unique)",
+          "firstName": "string",
+          "lastName": "string",
+          "userImage": "string (url of image"
           
       }
       ```
@@ -41,8 +41,8 @@ docker-compose up
     * GET /messages_new/:roomId/:offset? - this is another way to return messages of a room (if the user is a member). it will return the messages in 2 groups: 
       ```json
       {
-          readMessages: 'array that holds the last 20 read messages in the room',
-          unreadMessages: 'array that holds the first 20 unread messages in the room'
+          "readMessages": "array that holds the last 20 read messages in the room",
+          "unreadMessages": "array that holds the first 20 unread messages in the room"
       }
       ```
       the above description is in case that ```offset``` is not given, or its value is 0.
@@ -53,8 +53,8 @@ docker-compose up
       its body should hold (but not must):
       ```json
       {
-          messageText: string (holds the message text - optional),
-          messageImage: string (holds an image url - optional)
+          "messageText": "string (holds the message text - optional)",
+          "messageImage": "string (holds an image url - optional)"
       }
       ```
       can send both values, only one of them (or none. didn't bother with validating if at least one has value)
