@@ -1,0 +1,235 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Chat Server Deployment cloudformation template
+Parameters:
+  AmiId:
+    Type: String
+    Description: Ami Id to use for the instance (preferably type of linux with yum - like amazon 2 ami)
+  InstanceType:
+    Type: String
+    Description: Which instance type to use
+  ChatGitRepoUrl:
+    Type: String
+    Description: The URL of the git repo to clone from
+    
+Mappings:
+  # ranges to add more
+  SubnetConfig:
+    ChatVPC:
+      CIDR: '192.168.0.0/16'
+    PublicOne:
+      CIDR: '192.168.1.0/24'
+
+Resources:
+  ChatVpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      CidrBlock: !FindInMap ['SubnetConfig', 'ChatVPC', 'CIDR']
+      Tags:
+        - Key: Name
+          Value: Chat-server-VPC
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+         Fn::Select:
+         - 0
+         - Fn::GetAZs: {Ref: 'AWS::Region'}
+      VpcId: !Ref ChatVpc
+      CidrBlock: !FindInMap ['SubnetConfig', 'PublicOne', 'CIDR']
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: chat-Public-Subnet-1
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: Chat-Internet-GW
+  GatewayAttachement:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref ChatVpc
+      InternetGatewayId: !Ref 'InternetGateway'
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref ChatVpc
+      Tags:
+        - Key: Name
+          Value: Chat-public-route-table
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: GatewayAttachement
+    Properties:
+      RouteTableId: !Ref 'PublicRouteTable'
+      DestinationCidrBlock: '0.0.0.0/0'
+      GatewayId: !Ref 'InternetGateway'
+  PublicSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      RouteTableId: !Ref PublicRouteTable
+  ChatPublicSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: allow internet connection and access
+      VpcId: !Ref ChatVpc
+      SecurityGroupIngress:
+      - IpProtocol: -1
+        CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+      - IpProtocol: -1
+        CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: chat-public-sg
+
+  EC2Role:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: EC2UltraRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - ec2.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Policies:
+      - PolicyName: allow-logs
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - 'logs:*'
+            Resource: arn:aws:logs:*:*:*
+      - PolicyName: iamPermissions
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - "iam:PassRole"
+            - "iam:ListIntanceProfiles"
+            Resource: "*"
+      - PolicyName: ec2actions
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - "ec2:CreateTags"
+            - "ec2:DescribeTags"
+            - "ec2:RunInstances"
+            - "ec2:Describe*"
+            - "ec2:TerminateInstances"
+            - "ec2:StopInstances"
+            - "ec2:StartInstances"
+            - "ec2:DescribeInstanceAttribute"
+            - "ec2:ModifyInstanceAttribute"
+            Resource: "*"
+      - PolicyName: SsmParams
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - "ssm:DescribeParameters"
+            - "ssm:GetParameterHistory"
+            - "ssm:GetParametersByPath"
+            - "ssm:GetParameters"
+            - "ssm:GetParameter"
+            Resource: "*"
+
+  EC2IamProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: EC2Profile
+      Path: /
+      Roles:
+        - !Ref EC2Role
+
+  ChatServerLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateData:
+        EbsOptimized: false
+        DisableApiTermination: true
+        CreditSpecification:
+          CpuCredits: standard
+        IamInstanceProfile:
+          Arn: !GetAtt EC2IamProfile.Arn
+        ImageId: !Ref AmiId
+        InstanceType: !Ref InstanceType
+        Monitoring:
+          Enabled: true
+        SecurityGroupIds:
+          - !Ref ChatPublicSecurityGroup
+        TagSpecifications:
+           - ResourceType: volume
+             Tags:
+               - Key: Name
+                 Value: Chat-Server-Volume
+           - ResourceType: instance
+             Tags:
+               - Key: Name
+                 Value: Chat-Server-Instance
+        UserData:
+          Fn::Base64: !Sub
+            - |
+               #!/bin/bash
+               sudo yum update -y
+               curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.34.0/install.sh | bash
+               . ~/.nvm/nvm.sh
+               nvm install node
+               sudo yum update -y
+               sudo yum install git -y
+               sudo yum install -y docker
+               sudo service docker start
+               sudo usermod -a -G docker ec2-user
+               sudo chkconfig docker on
+               sudo curl -L https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m) -o /usr/local/bin/docker-compose
+               sudo chmod +x /usr/local/bin/docker-compose
+               cd /home/ec2-user
+               git clone ${gitRepo}
+               cd chatServer
+               docker-compose build
+               docker-compose up
+            - gitRepo: !Ref ChatGitRepoUrl
+      LaunchTemplateName: !Sub "chat-server-launchTemplate"
+
+  ChatServerInstance:
+    Type: AWS::EC2::Instance
+    DependsOn:
+      - ChatServerLaunchTemplate
+    Properties:
+      LaunchTemplate:
+        LaunchTemplateId: !Ref ChatServerLaunchTemplate
+        Version: !GetAtt ChatServerLaunchTemplate.LatestVersionNumber
+      SubnetId: !Ref PublicSubnet
+
+  ChatServerInstanceEIP:
+    Type: AWS::EC2::EIP
+    DependsOn:
+      - ChatServerInstance
+    Properties:
+        Domain: vpc
+        Tags:
+          - Key: Name
+            Value: Chat-Server-EIP
+
+  ChatServerInstanceAllocEIP:
+    Type: AWS::EC2::EIPAssociation
+    DependsOn:
+      - ChatServerInstance
+      - ChatServerInstanceEIP
+    Properties:
+      AllocationId: !GetAtt ChatServerInstanceEIP.AllocationId
+      InstanceId: !Ref ChatServerInstance

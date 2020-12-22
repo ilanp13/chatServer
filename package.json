@@ -18,6 +18,8 @@
       "typeorm": "0.2.29"
    },
    "scripts": {
-      "start": "ts-node src/index.ts"
+      "start": "ts-node src/index.ts",
+      "aws-deploy:create": "aws cloudformation create-stack --stack-name ChatServerStack --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM --template-body file://$(pwd)/cloudformation-template.yml --parameters ParameterKey=AmiId,ParameterValue=$AMI_ID ParameterKey=InstanceType,ParameterValue=$INSTANCE_TYPE ParameterKey=ChatGitRepoUrl,ParameterValue=$GIT_REPO_URL",
+      "aws-deploy:update": "aws cloudformation update-stack --stack-name ChatServerStack --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM --template-body file://$(pwd)/cloudformation-template.yml --parameters ParameterKey=AmiId,ParameterValue=$AMI_ID ParameterKey=InstanceType,ParameterValue=$INSTANCE_TYPE ParameterKey=ChatGitRepoUrl,ParameterValue=$GIT_REPO_URL"
    }
 }

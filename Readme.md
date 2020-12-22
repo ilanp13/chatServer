@@ -15,6 +15,7 @@ docker-compose up
 * Now you can start communicate with the server (the server listen on port 3000)
 * list of api endpoints:
   * annonymous endpoints (you can view them without "login")
+    * GET /health - health check
     * GET /users - will print all users
     * GET /users/:userId - will print specific user data
     * POST /users - will save a new user - with this params as body:
@@ -58,3 +59,20 @@ docker-compose up
       }
       ```
       can send both values, only one of them (or none. didn't bother with validating if at least one has value)
+
+## Deployment
+* I've added a cloudformation template yml file. if we want to deploy this to aws:
+  * install aws-cli and configure
+  * cd to the folder of the chat-server
+  * run the following command:
+    ```bash
+    export AMI_ID=XXXX 
+    export INSTANCE_TYPE=YYY 
+    export GIT_REPO_URL=ZZZ 
+    npm run aws-deploy
+    ```
+  * When you need to set the 3 paramets values with appropriate ones as environment variables or local variables like above.
+  * The stack will create a VPC, subnet, security group, launch template and instance to run the server and the mysql server (on same instance).
+  * I didn't implement any Load balancing, scaling... In production we would use a better mysql server than a dockerized one on the same instance as the api server itself.
+* I've deployed the server into a free tier account (mine).
+* You can view the api at: ```http://3.136.206.2:3000/health``` (it's an elastic IP, so should stay that ip)
