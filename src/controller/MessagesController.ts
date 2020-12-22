@@ -66,7 +66,7 @@ export class MessagesController {
                     lastVisit: userRoom.lastVisit
                 })
                 .leftJoin('msg.user', 'userData')
-                .limit(3)
+                .limit(20)
                 .offset(readOffset)
                 .orderBy('msg.createdAt', 'DESC')
                 .getRawMany()
@@ -80,7 +80,7 @@ export class MessagesController {
                     lastVisit: userRoom.lastVisit
                 })
                 .leftJoin('msg.user', 'userData')
-                .limit(3)
+                .limit(20)
                 .offset(unreadOffset)
                 .orderBy('msg.createdAt', 'ASC')
                 .getRawMany()
